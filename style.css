@@ -2,11 +2,8 @@ body {
   margin: 0;
   padding: 0;
   font-family: Arial, sans-serif;
-  background: rgb(21,119,147);
-  background: linear-gradient(45deg, rgba(21,119,147,1) 31%, rgba(84,171,187,1) 55%, rgba(178,235,236,1) 100%);
-  background-size: cover;
-  background-position: center;
-}
+  background-color: #E0E4CC;
+  }
 
 .header h1 {
   font-family: "Arial", sans-serif;
