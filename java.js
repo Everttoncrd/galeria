@@ -134,6 +134,11 @@ function handleScroll() {
   }
 }
 
+
+if (window.innerWidth < 768) {
+  window.addEventListener('scroll', handleScroll);
+}
+
 // Seletor para os links do menu
 const menuLinks = document.querySelectorAll('.header ul li a');
 
