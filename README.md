@@ -334,6 +334,8 @@ Desenvolvedor Júnior com foco em desenvolvimento web, estudando e construindo p
 
 GitHub: https://github.com/Everttoncrd
 
+![Preview do Viageiro's Tales](assets/preview.png)
+
 ---
 
 ⭐ Se este projeto foi útil ou interessante, considere deixar uma estrela no repositório.
