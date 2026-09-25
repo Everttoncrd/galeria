@@ -2,11 +2,11 @@
 // CONFIGURAÇÃO
 // ======================================================
 
-// TEMPORÁRIO.
-// Coloque sua chave da Pexels aqui.
-// NÃO publique a chave no GitHub.
 const API_URL =
-    "http://127.0.0.1:5000/api/images";
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost"
+        ? "http://127.0.0.1:5000/api/images"
+        : "/api/images";
 
 const PER_PAGE = 20;
 
@@ -25,206 +25,114 @@ const searchForm =
     document.getElementById("searchForm");
 
 const searchInput =
-    document.getElementById(
-        "new-search-input"
-    );
+    document.getElementById("new-search-input");
 
 const categoryButtons =
-    document.querySelectorAll(
-        ".category"
-    );
+    document.querySelectorAll(".category");
 
 const galleryTitle =
-    document.getElementById(
-        "galleryTitle"
-    );
+    document.getElementById("galleryTitle");
 
 const resultsInfo =
-    document.getElementById(
-        "resultsInfo"
-    );
+    document.getElementById("resultsInfo");
 
 const statusMessage =
-    document.getElementById(
-        "statusMessage"
-    );
+    document.getElementById("statusMessage");
 
 const loader =
-    document.getElementById(
-        "loader"
-    );
+    document.getElementById("loader");
 
 const scrollSentinel =
-    document.getElementById(
-        "scrollSentinel"
-    );
+    document.getElementById("scrollSentinel");
 
 const backToTop =
-    document.getElementById(
-        "backToTop"
-    );
+    document.getElementById("backToTop");
 
 
-// ======================================================
 // MENU
-// ======================================================
 
 const navbarToggle =
-    document.getElementById(
-        "navbarToggle"
-    );
+    document.getElementById("navbarToggle");
 
 const navbarMenu =
-    document.getElementById(
-        "navbarMenu"
-    );
+    document.getElementById("navbarMenu");
 
 const favoritesNav =
-    document.getElementById(
-        "favoritesNav"
-    );
+    document.getElementById("favoritesNav");
 
 const favoritesCount =
-    document.getElementById(
-        "favoritesCount"
-    );
+    document.getElementById("favoritesCount");
 
 
-// ======================================================
 // MODAL
-// ======================================================
 
 const imageModal =
-    document.getElementById(
-        "imageModal"
-    );
+    document.getElementById("imageModal");
 
 const modalImage =
-    document.getElementById(
-        "modalImage"
-    );
+    document.getElementById("modalImage");
 
 const modalPhotographer =
-    document.getElementById(
-        "modalPhotographer"
-    );
+    document.getElementById("modalPhotographer");
 
 const modalOriginal =
-    document.getElementById(
-        "modalOriginal"
-    );
+    document.getElementById("modalOriginal");
 
 const modalClose =
-    document.getElementById(
-        "modalClose"
-    );
+    document.getElementById("modalClose");
 
 const modalBackdrop =
-    document.querySelector(
-        ".modal-backdrop"
-    );
-
-const modalPrevious =
-    document.getElementById(
-        "modalPrevious"
-    );
-
-const modalNext =
-    document.getElementById(
-        "modalNext"
-    );
-
-const modalFavorite =
-    document.getElementById(
-        "modalFavorite"
-    );
-
-const modalCounter =
-    document.getElementById(
-        "modalCounter"
-    );
-
-const modalDescription =
-    document.getElementById(
-        "modalDescription"
-    );
-
-const modalPhotoBackground =
-    document.getElementById(
-        "modalPhotoBackground"
-    );
+    document.querySelector(".modal-backdrop");
 
 
 // ======================================================
 // ESTADO
 // ======================================================
 
-let currentQuery =
-    "travel";
+let currentQuery = "travel";
 
-let currentPage =
-    1;
+let currentPage = 1;
 
-let loading =
-    false;
+let loading = false;
 
-let hasMoreImages =
-    true;
+let hasMoreImages = true;
 
-let currentView =
-    "explore";
+let currentView = "explore";
 
-let favorites =
-    loadFavorites();
+let favorites = loadFavorites();
 
+let visiblePhotos = [];
 
-// Modal
+let currentModalIndex = -1;
 
-let visiblePhotos =
-    [];
+let requestController = null;
 
-let currentModalIndex =
-    0;
-
-let currentModalPhoto =
-    null;
-
-
-// API
-
-let currentController =
-    null;
-
-let requestVersion =
-    0;
+let requestVersion = 0;
 
 
 // ======================================================
-// FAVORITOS
+// FAVORITOS / LOCAL STORAGE
 // ======================================================
 
 function loadFavorites() {
 
     try {
 
-        const saved =
+        const savedFavorites =
             localStorage.getItem(
                 FAVORITES_STORAGE_KEY
             );
 
-        if (!saved) {
+        if (!savedFavorites) {
             return [];
         }
 
+        const parsedFavorites =
+            JSON.parse(savedFavorites);
 
-        const parsed =
-            JSON.parse(saved);
-
-
-        return Array.isArray(parsed)
-            ? parsed
+        return Array.isArray(parsedFavorites)
+            ? parsedFavorites
             : [];
-
 
     } catch (error) {
 
@@ -244,9 +152,7 @@ function saveFavorites() {
 
         localStorage.setItem(
             FAVORITES_STORAGE_KEY,
-            JSON.stringify(
-                favorites
-            )
+            JSON.stringify(favorites)
         );
 
     } catch (error) {
@@ -257,20 +163,16 @@ function saveFavorites() {
         );
     }
 
-
     updateFavoritesCount();
 }
 
 
 function updateFavoritesCount() {
 
-    if (!favoritesCount) {
-        return;
+    if (favoritesCount) {
+        favoritesCount.textContent =
+            favorites.length;
     }
-
-
-    favoritesCount.textContent =
-        favorites.length;
 }
 
 
@@ -289,15 +191,12 @@ function toggleFavorite(photo) {
     const alreadyFavorite =
         isFavorite(photo.id);
 
-
     if (alreadyFavorite) {
 
         favorites =
             favorites.filter(
                 (favorite) =>
-                    String(
-                        favorite.id
-                    ) !==
+                    String(favorite.id) !==
                     String(photo.id)
             );
 
@@ -305,8 +204,7 @@ function toggleFavorite(photo) {
 
         favorites.unshift({
 
-            id:
-                photo.id,
+            id: photo.id,
 
             alt:
                 photo.alt || "",
@@ -315,37 +213,40 @@ function toggleFavorite(photo) {
                 photo.photographer ||
                 "Fotógrafo desconhecido",
 
+            photographer_url:
+                photo.photographer_url || "#",
+
             url:
                 photo.url || "#",
 
             src: {
 
+                medium:
+                    photo.src?.medium || "",
+
                 large:
-                    photo.src.large,
+                    photo.src?.large || "",
 
                 large2x:
-                    photo.src.large2x ||
-                    photo.src.large
+                    photo.src?.large2x ||
+                    photo.src?.large ||
+                    ""
 
             }
 
         });
     }
 
-
     saveFavorites();
 
-
-    if (
-        currentView ===
-        "favorites"
-    ) {
+    if (currentView === "favorites") {
 
         renderFavorites();
 
     } else {
 
         updateFavoriteButtons();
+        updateModalFavoriteButton();
     }
 }
 
@@ -357,84 +258,62 @@ function updateFavoriteButtons() {
             ".favorite-button"
         );
 
-
     buttons.forEach(
         (button) => {
 
-            updateSingleFavoriteButton(
-                button,
-                button.dataset.photoId
+            const photoId =
+                button.dataset.photoId;
+
+            const favorite =
+                isFavorite(photoId);
+
+            button.textContent =
+                favorite
+                    ? "♥"
+                    : "♡";
+
+            button.classList.toggle(
+                "active",
+                favorite
             );
 
+            button.setAttribute(
+                "aria-label",
+                favorite
+                    ? "Remover dos favoritos"
+                    : "Adicionar aos favoritos"
+            );
         }
     );
 }
 
 
-function updateSingleFavoriteButton(
-    button,
-    photoId
-) {
-
-    const favorite =
-        isFavorite(photoId);
-
-
-    button.textContent =
-        favorite
-            ? "♥"
-            : "♡";
-
-
-    button.classList.toggle(
-        "active",
-        favorite
-    );
-
-
-    button.setAttribute(
-        "aria-label",
-        favorite
-            ? "Remover dos favoritos"
-            : "Adicionar aos favoritos"
-    );
-}
-
-
 // ======================================================
-// FAVORITOS VIEW
+// VISUALIZAÇÃO DE FAVORITOS
 // ======================================================
 
 function showFavorites() {
 
-    cancelCurrentRequest();
-
-
     currentView =
         "favorites";
 
-    loading =
-        false;
-
+    if (requestController) {
+        requestController.abort();
+    }
 
     hideLoader();
     hideStatus();
-
 
     favoritesNav?.classList.add(
         "active"
     );
 
-
     clearActiveCategories();
-
 
     galleryTitle.textContent =
         "Meus favoritos";
 
-
     renderFavorites();
-
 
     scrollToGallery();
 }
@@ -442,20 +321,15 @@ function showFavorites() {
 
 function renderFavorites() {
 
-    gallery.innerHTML =
-        "";
-
-
-    visiblePhotos =
-        [...favorites];
-
+    gallery.innerHTML = "";
 
     hideStatus();
 
+    visiblePhotos = [
+        ...favorites
+    ];
 
-    if (
-        favorites.length === 0
-    ) {
+    if (favorites.length === 0) {
 
         gallery.innerHTML = `
             <div class="favorites-empty">
@@ -469,28 +343,23 @@ function renderFavorites() {
                 </h3>
 
                 <p>
-                    Explore a galeria e clique
-                    no coração para salvar suas
+                    Explore a galeria e clique no
+                    coração para salvar suas
                     fotografias favoritas.
                 </p>
 
             </div>
         `;
 
-
         resultsInfo.textContent =
             "Você ainda não salvou nenhuma imagem";
-
 
         return;
     }
 
-
     renderImages(
-        favorites,
-        false
+        favorites
     );
-
 
     resultsInfo.textContent =
         `${favorites.length} ${
@@ -506,29 +375,11 @@ function activateExploreView() {
     currentView =
         "explore";
 
-
     favoritesNav?.classList.remove(
         "active"
     );
 
-
     hideStatus();
-}
-
-
-// ======================================================
-// CANCELAMENTO DE REQUEST
-// ======================================================
-
-function cancelCurrentRequest() {
-
-    if (currentController) {
-
-        currentController.abort();
-
-        currentController =
-            null;
-    }
 }
 
 
@@ -544,11 +395,15 @@ async function fetchImages(
 
     const params =
         new URLSearchParams({
-            query,
-            page,
-            per_page: PER_PAGE
-        });
 
+            query,
+
+            page,
+
+            per_page:
+                PER_PAGE
+
+        });
 
     const response =
         await fetch(
@@ -558,10 +413,19 @@ async function fetchImages(
             }
         );
 
+    let data;
 
-    const data =
-        await response.json();
+    try {
 
+        data =
+            await response.json();
+
+    } catch {
+
+        throw new Error(
+            "O servidor retornou uma resposta inválida."
+        );
+    }
 
     if (!response.ok) {
 
@@ -571,7 +435,6 @@ async function fetchImages(
         );
     }
 
-
     return data;
 }
 
@@ -580,17 +443,12 @@ async function fetchImages(
 // SKELETON
 // ======================================================
 
-function showSkeletons(
-    amount = 8
-) {
+function showSkeletons(amount = 8) {
 
-    gallery.innerHTML =
-        "";
-
+    gallery.innerHTML = "";
 
     const fragment =
         document.createDocumentFragment();
-
 
     for (
         let index = 0;
@@ -599,20 +457,15 @@ function showSkeletons(
     ) {
 
         const skeleton =
-            document.createElement(
-                "div"
-            );
-
+            document.createElement("div");
 
         skeleton.className =
             "skeleton-item";
-
 
         fragment.appendChild(
             skeleton
         );
     }
-
 
     gallery.appendChild(
         fragment
@@ -622,14 +475,18 @@ function showSkeletons(
 
 function removeSkeletons() {
 
-    gallery
-        .querySelectorAll(
+    const skeletons =
+        gallery.querySelectorAll(
             ".skeleton-item"
-        )
-        .forEach(
-            (skeleton) =>
-                skeleton.remove()
         );
+
+    skeletons.forEach(
+        (skeleton) => {
+
+            skeleton.remove();
+
+        }
+    );
 }
 
 
@@ -641,21 +498,13 @@ async function loadImages({
     reset = false
 } = {}) {
 
-    if (
-        currentView !==
-        "explore"
-    ) {
+    if (currentView !== "explore") {
         return;
     }
 
-
-    if (
-        loading &&
-        !reset
-    ) {
+    if (loading && !reset) {
         return;
     }
-
 
     if (
         !hasMoreImages &&
@@ -667,115 +516,110 @@ async function loadImages({
 
     if (reset) {
 
-        cancelCurrentRequest();
+        if (requestController) {
+            requestController.abort();
+        }
+
+        requestController =
+            new AbortController();
 
         requestVersion++;
 
-        currentPage =
-            1;
+        currentPage = 1;
 
-        hasMoreImages =
-            true;
+        hasMoreImages = true;
 
-        visiblePhotos =
-            [];
+        visiblePhotos = [];
 
         showSkeletons();
+
+    } else if (!requestController) {
+
+        requestController =
+            new AbortController();
     }
 
 
-    const thisVersion =
+    const thisRequestVersion =
         requestVersion;
 
-
-    const pageToLoad =
-        currentPage;
-
-
-    const queryToLoad =
-        currentQuery;
-
-
-    currentController =
-        new AbortController();
-
-
-    loading =
-        true;
-
+    loading = true;
 
     hideStatus();
 
-
-    if (!reset) {
-
-        showLoader();
-
-    } else {
-
-        hideLoader();
-    }
+    showLoader();
 
 
     try {
 
         const data =
             await fetchImages(
-                queryToLoad,
-                pageToLoad,
-                currentController.signal
+                currentQuery,
+                currentPage,
+                requestController.signal
             );
 
 
         if (
-            thisVersion !==
-                requestVersion ||
+            thisRequestVersion !==
+            requestVersion
+        ) {
+            return;
+        }
+
+
+        if (
             currentView !==
-                "explore"
+            "explore"
         ) {
             return;
         }
 
 
         const photos =
-            data.photos || [];
+            Array.isArray(data.photos)
+                ? data.photos
+                : [];
 
 
         if (reset) {
 
             removeSkeletons();
+
+            gallery.innerHTML =
+                "";
+
         }
 
 
         if (
             photos.length === 0 &&
-            pageToLoad === 1
+            currentPage === 1
         ) {
 
             gallery.innerHTML =
                 "";
 
-
             showStatus(
-                `Nenhuma imagem encontrada para "${queryToLoad}".`
+                `Nenhuma imagem encontrada para "${currentQuery}".`
             );
-
 
             resultsInfo.textContent =
                 "Tente pesquisar outro termo.";
 
-
-            hasMoreImages =
-                false;
-
+            hasMoreImages = false;
 
             return;
         }
 
 
+        visiblePhotos.push(
+            ...photos
+        );
+
+
         renderImages(
-            photos,
-            true
+            photos
         );
 
 
@@ -798,17 +642,14 @@ async function loadImages({
 
         if (
             !data.next_page ||
-            photos.length <
-                PER_PAGE
+            photos.length < PER_PAGE
         ) {
 
-            hasMoreImages =
-                false;
+            hasMoreImages = false;
         }
 
 
-        currentPage =
-            pageToLoad + 1;
+        currentPage++;
 
 
     } catch (error) {
@@ -820,24 +661,17 @@ async function loadImages({
             return;
         }
 
+        console.error(error);
 
-        console.error(
-            "Erro ao buscar imagens:",
-            error
-        );
+        removeSkeletons();
 
 
         if (
-            thisVersion !==
-                requestVersion ||
             currentView !==
-                "explore"
+            "explore"
         ) {
             return;
         }
-
-
-        removeSkeletons();
 
 
         if (reset) {
@@ -852,7 +686,6 @@ async function loadImages({
             "Ocorreu um erro ao carregar as imagens."
         );
 
-
         resultsInfo.textContent =
             "Não foi possível carregar os resultados.";
 
@@ -860,17 +693,11 @@ async function loadImages({
     } finally {
 
         if (
-            thisVersion ===
+            thisRequestVersion ===
             requestVersion
         ) {
 
-            loading =
-                false;
-
-
-            currentController =
-                null;
-
+            loading = false;
 
             hideLoader();
         }
@@ -879,61 +706,13 @@ async function loadImages({
 
 
 // ======================================================
-// RENDER
+// RENDERIZAR IMAGENS
 // ======================================================
 
-function renderImages(
-    photos,
-    addToVisible = true
-) {
-
-    if (
-        currentView ===
-        "favorites"
-    ) {
-
-        visiblePhotos =
-            [...favorites];
-
-    } else if (
-        addToVisible
-    ) {
-
-        const existingIds =
-            new Set(
-                visiblePhotos.map(
-                    (photo) =>
-                        String(photo.id)
-                )
-            );
-
-
-        photos.forEach(
-            (photo) => {
-
-                if (
-                    !existingIds.has(
-                        String(photo.id)
-                    )
-                ) {
-
-                    visiblePhotos.push(
-                        photo
-                    );
-
-
-                    existingIds.add(
-                        String(photo.id)
-                    );
-                }
-            }
-        );
-    }
-
+function renderImages(photos) {
 
     const fragment =
         document.createDocumentFragment();
-
 
     photos.forEach(
         (photo, index) => {
@@ -943,21 +722,17 @@ function renderImages(
                     photo
                 );
 
-
             item.style.animationDelay =
                 `${Math.min(
                     index * 35,
                     350
                 )}ms`;
 
-
             fragment.appendChild(
                 item
             );
-
         }
     );
-
 
     gallery.appendChild(
         fragment
@@ -966,36 +741,45 @@ function renderImages(
 
 
 // ======================================================
-// CARD
+// CRIAR CARD
 // ======================================================
 
-function createGalleryItem(
-    photo
-) {
+function createGalleryItem(photo) {
 
     const article =
         document.createElement(
             "article"
         );
 
-
     article.className =
         "gallery-item";
-
 
     article.tabIndex =
         0;
 
+    article.dataset.photoId =
+        photo.id;
+
+    article.setAttribute(
+        "aria-label",
+        `Fotografia de ${
+            photo.photographer ||
+            "fotógrafo desconhecido"
+        }`
+    );
+
+
+    // IMAGEM
 
     const image =
         document.createElement(
             "img"
         );
 
-
     image.src =
-        photo.src.large;
-
+        photo.src?.large ||
+        photo.src?.medium ||
+        "";
 
     image.alt =
         photo.alt ||
@@ -1004,10 +788,8 @@ function createGalleryItem(
             "fotógrafo desconhecido"
         }`;
 
-
     image.loading =
         "lazy";
-
 
     image.decoding =
         "async";
@@ -1020,24 +802,36 @@ function createGalleryItem(
             "button"
         );
 
-
     favoriteButton.className =
         "favorite-button";
-
 
     favoriteButton.type =
         "button";
 
-
     favoriteButton.dataset.photoId =
         photo.id;
 
+    const favorite =
+        isFavorite(
+            photo.id
+        );
 
-    updateSingleFavoriteButton(
-        favoriteButton,
-        photo.id
+    favoriteButton.textContent =
+        favorite
+            ? "♥"
+            : "♡";
+
+    favoriteButton.classList.toggle(
+        "active",
+        favorite
     );
 
+    favoriteButton.setAttribute(
+        "aria-label",
+        favorite
+            ? "Remover dos favoritos"
+            : "Adicionar aos favoritos"
+    );
 
     favoriteButton.addEventListener(
         "click",
@@ -1045,31 +839,10 @@ function createGalleryItem(
 
             event.stopPropagation();
 
-
             toggleFavorite(
                 photo
             );
-
-
-            if (
-                currentModalPhoto &&
-                String(
-                    currentModalPhoto.id
-                ) ===
-                String(photo.id)
-            ) {
-
-                updateModalFavorite();
-            }
-
         }
-    );
-
-
-    favoriteButton.addEventListener(
-        "keydown",
-        (event) =>
-            event.stopPropagation()
     );
 
 
@@ -1080,7 +853,6 @@ function createGalleryItem(
             "div"
         );
 
-
     overlay.className =
         "image-overlay";
 
@@ -1090,10 +862,8 @@ function createGalleryItem(
             "span"
         );
 
-
     photographer.className =
         "photographer";
-
 
     photographer.textContent =
         photo.photographer ||
@@ -1105,10 +875,8 @@ function createGalleryItem(
             "span"
         );
 
-
     viewText.className =
         "view-image";
-
 
     viewText.textContent =
         "Visualizar fotografia";
@@ -1127,12 +895,20 @@ function createGalleryItem(
     );
 
 
+    // CLIQUE
+
     article.addEventListener(
         "click",
-        () =>
-            openModal(photo)
+        () => {
+
+            openModal(
+                photo
+            );
+        }
     );
 
+
+    // ACESSIBILIDADE POR TECLADO
 
     article.addEventListener(
         "keydown",
@@ -1145,7 +921,6 @@ function createGalleryItem(
                 return;
             }
 
-
             if (
                 event.key ===
                     "Enter" ||
@@ -1155,9 +930,10 @@ function createGalleryItem(
 
                 event.preventDefault();
 
-                openModal(photo);
+                openModal(
+                    photo
+                );
             }
-
         }
     );
 
@@ -1170,43 +946,34 @@ function createGalleryItem(
 // PESQUISA
 // ======================================================
 
-searchForm?.addEventListener(
+searchForm.addEventListener(
     "submit",
-    async (event) => {
+    (event) => {
 
         event.preventDefault();
 
-
         const query =
             searchInput.value.trim();
-
 
         if (!query) {
             return;
         }
 
-
         activateExploreView();
-
 
         currentQuery =
             query;
 
-
         galleryTitle.textContent =
             `Resultados para "${query}"`;
 
-
         clearActiveCategories();
 
-
-        scrollToGallery();
-
-
-        await loadImages({
+        loadImages({
             reset: true
         });
 
+        scrollToGallery();
     }
 );
 
@@ -1220,50 +987,39 @@ categoryButtons.forEach(
 
         button.addEventListener(
             "click",
-            async () => {
+            () => {
 
                 const query =
                     button.dataset.query;
-
 
                 if (!query) {
                     return;
                 }
 
-
                 activateExploreView();
-
 
                 currentQuery =
                     query;
 
-
                 searchInput.value =
                     "";
 
-
                 clearActiveCategories();
-
 
                 button.classList.add(
                     "active"
                 );
 
-
                 galleryTitle.textContent =
                     button.textContent.trim();
 
-
-                scrollToGallery();
-
-
-                await loadImages({
+                loadImages({
                     reset: true
                 });
 
+                scrollToGallery();
             }
         );
-
     }
 );
 
@@ -1271,37 +1027,34 @@ categoryButtons.forEach(
 function clearActiveCategories() {
 
     categoryButtons.forEach(
-        (button) =>
+        (button) => {
 
             button.classList.remove(
                 "active"
-            )
-
+            );
+        }
     );
 }
 
 
 // ======================================================
-// FAVORITOS MENU
+// BOTÃO FAVORITOS
 // ======================================================
 
-favoritesNav?.addEventListener(
+favoritesNav.addEventListener(
     "click",
     () => {
 
         showFavorites();
 
-
-        navbarMenu?.classList.remove(
+        navbarMenu.classList.remove(
             "show"
         );
 
-
-        navbarToggle?.setAttribute(
+        navbarToggle.setAttribute(
             "aria-expanded",
             "false"
         );
-
     }
 );
 
@@ -1310,478 +1063,273 @@ favoritesNav?.addEventListener(
 // MODAL
 // ======================================================
 
+function getPhotoIndex(photo) {
+
+    return visiblePhotos.findIndex(
+        (item) =>
+            String(item.id) ===
+            String(photo.id)
+    );
+}
+
+
 function openModal(photo) {
 
-    currentModalPhoto =
-        photo;
-
-
-    const foundIndex =
-        visiblePhotos.findIndex(
-            (item) =>
-                String(item.id) ===
-                String(photo.id)
+    currentModalIndex =
+        getPhotoIndex(
+            photo
         );
 
+    updateModal(
+        photo
+    );
 
-    currentModalIndex =
-        foundIndex >= 0
-            ? foundIndex
-            : 0;
-
-
-    if (
-        foundIndex === -1
-    ) {
-
-        visiblePhotos =
-            [photo];
-
-        currentModalIndex =
-            0;
-    }
-
-
-    updateModalContent();
-
-
-    imageModal?.classList.add(
+    imageModal.classList.add(
         "open"
     );
 
-
-    imageModal?.setAttribute(
+    imageModal.setAttribute(
         "aria-hidden",
         "false"
     );
-
 
     document.body.classList.add(
         "modal-open"
     );
 
-
-    modalClose?.focus();
+    modalClose.focus();
 }
 
 
-// ======================================================
-// ATUALIZAR MODAL
-// ======================================================
+function updateModal(photo) {
 
-function updateModalContent() {
+    if (!photo) {
+        return;
+    }
+
+    modalImage.src =
+        photo.src?.large2x ||
+        photo.src?.large ||
+        "";
+
+    modalImage.alt =
+        photo.alt ||
+        `Fotografia de ${
+            photo.photographer ||
+            "fotógrafo desconhecido"
+        }`;
+
+    modalPhotographer.textContent =
+        photo.photographer ||
+        "Fotógrafo desconhecido";
+
+    modalOriginal.href =
+        photo.url || "#";
+
+    updateModalFavoriteButton();
+}
+
+
+function closeModal() {
+
+    imageModal.classList.remove(
+        "open"
+    );
+
+    imageModal.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+    document.body.classList.remove(
+        "modal-open"
+    );
+
+    modalImage.src =
+        "";
+
+    currentModalIndex =
+        -1;
+}
+
+
+function showPreviousPhoto() {
 
     if (
-        !visiblePhotos.length
+        visiblePhotos.length === 0
     ) {
         return;
     }
 
+    currentModalIndex =
+        currentModalIndex <= 0
+            ? visiblePhotos.length - 1
+            : currentModalIndex - 1;
+
+    updateModal(
+        visiblePhotos[
+            currentModalIndex
+        ]
+    );
+}
+
+
+function showNextPhoto() {
+
+    if (
+        visiblePhotos.length === 0
+    ) {
+        return;
+    }
+
+    currentModalIndex =
+        currentModalIndex >=
+        visiblePhotos.length - 1
+            ? 0
+            : currentModalIndex + 1;
+
+    updateModal(
+        visiblePhotos[
+            currentModalIndex
+        ]
+    );
+}
+
+
+function updateModalFavoriteButton() {
+
+    const modalFavorite =
+        document.getElementById(
+            "modalFavorite"
+        );
+
+    if (
+        !modalFavorite ||
+        currentModalIndex < 0 ||
+        !visiblePhotos[
+            currentModalIndex
+        ]
+    ) {
+        return;
+    }
 
     const photo =
         visiblePhotos[
             currentModalIndex
         ];
 
-
-    if (!photo) {
-        return;
-    }
-
-
-    currentModalPhoto =
-        photo;
-
-
-    const imageUrl =
-        photo.src.large2x ||
-        photo.src.large;
-
-
-    // FOTO PRINCIPAL
-
-    if (modalImage) {
-
-        modalImage.style.opacity =
-            "0";
-
-
-        modalImage.src =
-            imageUrl;
-
-
-        modalImage.alt =
-            photo.alt ||
-            `Fotografia de ${
-                photo.photographer ||
-                "fotógrafo desconhecido"
-            }`;
-
-
-        modalImage.onload =
-            () => {
-
-                modalImage.style.opacity =
-                    "1";
-            };
-    }
-
-
-    // BACKGROUND DINÂMICO
-
-    if (
-        modalPhotoBackground
-    ) {
-
-        modalPhotoBackground.style.backgroundImage =
-            `url("${imageUrl}")`;
-    }
-
-
-    // FOTÓGRAFO
-
-    if (
-        modalPhotographer
-    ) {
-
-        modalPhotographer.textContent =
-            photo.photographer ||
-            "Fotógrafo desconhecido";
-    }
-
-
-    // DESCRIÇÃO
-
-    if (
-        modalDescription
-    ) {
-
-        modalDescription.textContent =
-            photo.alt ||
-            "Fotografia selecionada na galeria.";
-    }
-
-
-    // LINK
-
-    if (
-        modalOriginal
-    ) {
-
-        modalOriginal.href =
-            photo.url || "#";
-    }
-
-
-    // CONTADOR
-
-    if (
-        modalCounter
-    ) {
-
-        const current =
-            String(
-                currentModalIndex + 1
-            ).padStart(
-                2,
-                "0"
-            );
-
-
-        const total =
-            String(
-                visiblePhotos.length
-            ).padStart(
-                2,
-                "0"
-            );
-
-
-        modalCounter.textContent =
-            `${current} / ${total}`;
-    }
-
-
-    updateModalFavorite();
-
-    updateModalNavigation();
-}
-
-
-// ======================================================
-// FAVORITO MODAL
-// ======================================================
-
-function updateModalFavorite() {
-
-    if (
-        !modalFavorite ||
-        !currentModalPhoto
-    ) {
-        return;
-    }
-
-
     const favorite =
         isFavorite(
-            currentModalPhoto.id
+            photo.id
         );
 
+    modalFavorite.textContent =
+        favorite
+            ? "♥"
+            : "♡";
 
     modalFavorite.classList.toggle(
         "active",
         favorite
     );
 
-
-    modalFavorite.textContent =
+    modalFavorite.setAttribute(
+        "aria-label",
         favorite
-            ? "♥ Favoritado"
-            : "♡ Favoritar";
+            ? "Remover dos favoritos"
+            : "Adicionar aos favoritos"
+    );
 }
 
 
-modalFavorite?.addEventListener(
+modalClose.addEventListener(
     "click",
-    () => {
-
-        if (
-            !currentModalPhoto
-        ) {
-            return;
-        }
+    closeModal
+);
 
 
-        if (
-            currentView !==
-            "favorites"
-        ) {
+modalBackdrop.addEventListener(
+    "click",
+    closeModal
+);
+
+
+const modalPrevious =
+    document.getElementById(
+        "modalPrevious"
+    );
+
+const modalNext =
+    document.getElementById(
+        "modalNext"
+    );
+
+const modalFavorite =
+    document.getElementById(
+        "modalFavorite"
+    );
+
+
+if (modalPrevious) {
+
+    modalPrevious.addEventListener(
+        "click",
+        showPreviousPhoto
+    );
+}
+
+
+if (modalNext) {
+
+    modalNext.addEventListener(
+        "click",
+        showNextPhoto
+    );
+}
+
+
+if (modalFavorite) {
+
+    modalFavorite.addEventListener(
+        "click",
+        () => {
+
+            if (
+                currentModalIndex < 0
+            ) {
+                return;
+            }
+
+            const photo =
+                visiblePhotos[
+                    currentModalIndex
+                ];
+
+            if (!photo) {
+                return;
+            }
 
             toggleFavorite(
-                currentModalPhoto
+                photo
             );
 
-
-            updateModalFavorite();
-
-            return;
+            updateModalFavoriteButton();
         }
-
-
-        const oldIndex =
-            currentModalIndex;
-
-
-        toggleFavorite(
-            currentModalPhoto
-        );
-
-
-        visiblePhotos =
-            [...favorites];
-
-
-        if (
-            visiblePhotos.length ===
-            0
-        ) {
-
-            closeModal();
-
-            return;
-        }
-
-
-        currentModalIndex =
-            Math.min(
-                oldIndex,
-                visiblePhotos.length - 1
-            );
-
-
-        updateModalContent();
-
-    }
-);
-
-
-// ======================================================
-// NAVEGAÇÃO MODAL
-// ======================================================
-
-function showPreviousImage() {
-
-    if (
-        visiblePhotos.length <= 1
-    ) {
-        return;
-    }
-
-
-    currentModalIndex--;
-
-
-    if (
-        currentModalIndex < 0
-    ) {
-
-        currentModalIndex =
-            visiblePhotos.length - 1;
-    }
-
-
-    updateModalContent();
-}
-
-
-function showNextImage() {
-
-    if (
-        visiblePhotos.length <= 1
-    ) {
-        return;
-    }
-
-
-    currentModalIndex++;
-
-
-    if (
-        currentModalIndex >=
-        visiblePhotos.length
-    ) {
-
-        currentModalIndex =
-            0;
-    }
-
-
-    updateModalContent();
-}
-
-
-function updateModalNavigation() {
-
-    const disabled =
-        visiblePhotos.length <= 1;
-
-
-    if (
-        modalPrevious
-    ) {
-
-        modalPrevious.disabled =
-            disabled;
-
-
-        modalPrevious.style.opacity =
-            disabled
-                ? "0.3"
-                : "1";
-    }
-
-
-    if (
-        modalNext
-    ) {
-
-        modalNext.disabled =
-            disabled;
-
-
-        modalNext.style.opacity =
-            disabled
-                ? "0.3"
-                : "1";
-    }
-}
-
-
-modalPrevious?.addEventListener(
-    "click",
-    showPreviousImage
-);
-
-
-modalNext?.addEventListener(
-    "click",
-    showNextImage
-);
-
-
-// ======================================================
-// FECHAR MODAL
-// ======================================================
-
-function closeModal() {
-
-    imageModal?.classList.remove(
-        "open"
     );
-
-
-    imageModal?.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-
-
-    document.body.classList.remove(
-        "modal-open"
-    );
-
-
-    if (
-        modalImage
-    ) {
-
-        modalImage.src =
-            "";
-    }
-
-
-    if (
-        modalPhotoBackground
-    ) {
-
-        modalPhotoBackground.style.backgroundImage =
-            "none";
-    }
-
-
-    currentModalPhoto =
-        null;
 }
 
-
-modalClose?.addEventListener(
-    "click",
-    closeModal
-);
-
-
-modalBackdrop?.addEventListener(
-    "click",
-    closeModal
-);
-
-
-// ======================================================
-// TECLADO
-// ======================================================
 
 document.addEventListener(
     "keydown",
     (event) => {
 
         if (
-            !imageModal?.classList.contains(
+            !imageModal.classList.contains(
                 "open"
             )
         ) {
             return;
         }
-
 
         if (
             event.key ===
@@ -1790,33 +1338,20 @@ document.addEventListener(
 
             closeModal();
 
-            return;
-        }
-
-
-        if (
+        } else if (
             event.key ===
             "ArrowLeft"
         ) {
 
-            event.preventDefault();
+            showPreviousPhoto();
 
-            showPreviousImage();
-
-            return;
-        }
-
-
-        if (
+        } else if (
             event.key ===
             "ArrowRight"
         ) {
 
-            event.preventDefault();
-
-            showNextImage();
+            showNextPhoto();
         }
-
     }
 );
 
@@ -1828,7 +1363,6 @@ document.addEventListener(
 function showLoader() {
 
     if (
-        loader &&
         currentView ===
         "explore"
     ) {
@@ -1841,11 +1375,8 @@ function showLoader() {
 
 function hideLoader() {
 
-    if (loader) {
-
-        loader.hidden =
-            true;
-    }
+    loader.hidden =
+        true;
 }
 
 
@@ -1855,14 +1386,8 @@ function hideLoader() {
 
 function showStatus(message) {
 
-    if (!statusMessage) {
-        return;
-    }
-
-
     statusMessage.textContent =
         message;
-
 
     statusMessage.classList.add(
         "show"
@@ -1872,14 +1397,8 @@ function showStatus(message) {
 
 function hideStatus() {
 
-    if (!statusMessage) {
-        return;
-    }
-
-
     statusMessage.textContent =
         "";
-
 
     statusMessage.classList.remove(
         "show"
@@ -1898,7 +1417,6 @@ const observer =
             const entry =
                 entries[0];
 
-
             if (
                 entry.isIntersecting &&
                 currentView ===
@@ -1909,25 +1427,19 @@ const observer =
 
                 loadImages();
             }
-
         },
         {
-
             root: null,
 
             rootMargin:
                 "500px 0px",
 
-            threshold:
-                0
-
+            threshold: 0
         }
     );
 
 
-if (
-    scrollSentinel
-) {
+if (scrollSentinel) {
 
     observer.observe(
         scrollSentinel
@@ -1939,23 +1451,19 @@ if (
 // MENU MOBILE
 // ======================================================
 
-navbarToggle?.addEventListener(
+navbarToggle.addEventListener(
     "click",
     () => {
 
         const isOpen =
-            navbarMenu?.classList.toggle(
+            navbarMenu.classList.toggle(
                 "show"
             );
 
-
         navbarToggle.setAttribute(
             "aria-expanded",
-            String(
-                Boolean(isOpen)
-            )
+            String(isOpen)
         );
-
     }
 );
 
@@ -1971,53 +1479,45 @@ document
                 "click",
                 () => {
 
-                    navbarMenu?.classList.remove(
+                    navbarMenu.classList.remove(
                         "show"
                     );
 
-
-                    navbarToggle?.setAttribute(
+                    navbarToggle.setAttribute(
                         "aria-expanded",
                         "false"
                     );
-
                 }
             );
-
         }
     );
 
 
 // ======================================================
-// SCROLL GALERIA
+// SCROLL PARA GALERIA
 // ======================================================
 
 function scrollToGallery() {
 
-    const section =
+    const gallerySection =
         document.getElementById(
             "galeria"
         );
 
-
-    if (!section) {
+    if (!gallerySection) {
         return;
     }
-
 
     setTimeout(
         () => {
 
-            section.scrollIntoView({
-
+            gallerySection.scrollIntoView({
                 behavior:
                     "smooth",
 
                 block:
                     "start"
-
             });
-
         },
         100
     );
@@ -2036,50 +1536,53 @@ window.addEventListener(
             return;
         }
 
+        if (
+            window.scrollY >
+            600
+        ) {
 
-        backToTop.classList.toggle(
-            "show",
-            window.scrollY > 600
-        );
+            backToTop.classList.add(
+                "show"
+            );
 
+        } else {
+
+            backToTop.classList.remove(
+                "show"
+            );
+        }
     },
     {
-        passive:
-            true
+        passive: true
     }
 );
 
 
-backToTop?.addEventListener(
-    "click",
-    () => {
+if (backToTop) {
 
-        window.scrollTo({
+    backToTop.addEventListener(
+        "click",
+        () => {
 
-            top:
-                0,
-
-            behavior:
-                "smooth"
-
-        });
-
-    }
-);
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+        }
+    );
+}
 
 
 // ======================================================
-// INICIAR
+// INICIALIZAÇÃO
 // ======================================================
 
 async function init() {
 
     updateFavoritesCount();
 
-
     galleryTitle.textContent =
         "Explore imagens";
-
 
     await loadImages({
         reset: true
